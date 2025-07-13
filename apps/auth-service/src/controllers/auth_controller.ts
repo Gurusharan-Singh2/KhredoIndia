@@ -1,7 +1,7 @@
 // Register a new user
 import bcrypt from "bcryptjs"
 import  { NextFunction, Request, Response } from "express";
-import jwt from 'jsonwebtoken'
+import jwt, { JsonWebTokenError } from 'jsonwebtoken'
 
 import { checkOtpRestrictions, handleForgotPassword, sendOtp, trackOtpRequests, validateRegistrationData, verifyForgotPasswordOtp, verifyOtp } from "../utils/auth_helper";
 import { AuthenticationError, ValidationError } from "@packages/error-handler";
@@ -26,8 +26,8 @@ export const userRegistration = async (
   if(existingUser){
     return next(new ValidationError("user already exist with email"))
   }
-  await checkOtpRestrictions(email,next);
-  await trackOtpRequests(email,next);
+  await checkOtpRestrictions(email);
+  await trackOtpRequests(email);
 
   await  sendOtp(name,email);
 
@@ -112,6 +112,64 @@ export const loginUser=async(req:Request,res:Response,next:NextFunction)=>{
    } catch (error) {
     return next(error)
    }
+}
+
+
+// refresh token user
+export const refershToken=async(req:Request,res:Response,next:NextFunction)=>{
+  try {
+    const refershToken=req.cookies.refresh_token;
+    if(!refershToken){
+      throw new ValidationError("Unauthorized! No refresh token.");
+
+    }
+    const decoded=jwt.verify(
+      refershToken,process.env.REFRESH_SECRET as string
+    ) as {
+      id:string,
+      role:string
+    }
+
+    if(!decoded || !decoded.id || !decoded.role){
+      throw new JsonWebTokenError("Forbidden ! Invalid Refresh Token.")
+    }
+
+    // let account;
+    // if(decoded.role==='user'||'seller')
+    const user =await prisma.users.findUnique({
+      where:{
+        id:decoded.id,
+      }
+    });
+    if(!user){
+      throw new AuthenticationError("Forbidden ! User/Seller not found");
+    }
+
+    const newAccessToken=jwt.sign({
+      id:decoded.id,role:decoded.role},
+    process.env.ACCESS_SECRET as string,{
+      expiresIn:"30m"
+    });
+    setCookie(res,"access_token",newAccessToken);
+    return res.status(201).json({
+      success:true
+    })
+    
+  } catch (error) {
+    return next(error)
+  }
+}
+
+export const getUser=async(req:any,res:Response,next:NextFunction)=>{
+  try {
+    const user=req.user;
+  res.status(201).json({
+    success:true,
+    user
+  })
+  } catch (error) {
+  return  next(error)
+  }
 }
 
 // UserforgotPaswword

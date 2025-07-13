@@ -1,5 +1,6 @@
 import express, { Request, Response, Router } from 'express'
-import { loginUser, resetUserPassword, UserforgotPassword, userRegistration, verifyForgotPassword, VerifyUser } from '../controllers/auth_controller';
+import { getUser, loginUser, refershToken, resetUserPassword, UserforgotPassword, userRegistration, verifyForgotPassword, VerifyUser } from '../controllers/auth_controller';
+import isAuthenticated from '@packages/middleware/isAuthenticated';
 
 
 const router:Router=express.Router();
@@ -14,6 +15,8 @@ router.post("/verify-user", VerifyUser);
 // login
 
 router.post("/login-user",loginUser);
+router.post("/refresh-token-user",refershToken);
+router.get("/logged-in-user",isAuthenticated,getUser);
 
 router.post("/forgot-password-user", UserforgotPassword );
 router.post("/verify-forgot-password-otp", verifyForgotPassword );

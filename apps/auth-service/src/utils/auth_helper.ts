@@ -24,22 +24,20 @@ if(!name || !email || !password || ((userType === "seller") && (!phone || !count
 }
 
 // otp restriction check
-export const checkOtpRestrictions=async(email:string,next:NextFunction)=>{
+export const checkOtpRestrictions=async(email:string)=>{
   if(await redis.get(`otp_lock:${email}`)){
-    return next(
-      new ValidationError("Account locked due to multiple failed attemps! Try again after 30 minutes")
-    )
+   throw new ValidationError("Account locked due to multiple failed attemps! Try again after 30 minutes")
+    
   }
   if(await redis.get(`otp_spam_lock:${email}`)){
-    return next(
-      new ValidationError("Too many OTP requests! Please wait 1 hour before requesting again.")
-    )
+    throw new ValidationError("Too many OTP requests! Please wait 1 hour before requesting again.")
+    
   }
 
   if(await redis.get(`otp_cooldown:${email}`)){
-    return next(
-      new ValidationError("Please wait 1 minute before requesting new Otp!")
-    )
+    
+    throw  new ValidationError("Please wait 1 minute before requesting new Otp!")
+    
   }
 
 }
@@ -246,12 +244,12 @@ export const generateForgotEmailTemplate = (otp: string, name: string) => `
 
 
 // track otp request
-export const trackOtpRequests=async(email:string, next:NextFunction)=>{
+export const trackOtpRequests=async(email:string)=>{
   const otpRequestKey=`otp_request_count:${email}`
   let otpRequest=parseInt((await redis.get(otpRequestKey))|| "0");
   if(otpRequest>=2){
     await redis.set(`otp_spam_lock:${email}`,"locked","EX",3600); // for 1 hour
-    return next(new ValidationError("To many otp request .Please wait 1 hour before requesting otp"))
+    throw new ValidationError("To many otp request .Please wait 1 hour before requesting otp")
 
   }
 
@@ -303,8 +301,8 @@ export const handleForgotPassword=async(req:Request,res:Response,next:NextFuncti
       throw new AuthenticationError("User not found!!!");
     }
 
-    await checkOtpRestrictions(email,next);
-    await trackOtpRequests(email,next);
+    await checkOtpRestrictions(email);
+    await trackOtpRequests(email);
     await sendForgotOtp(user.name,email);
 
     res.status(200).json({
@@ -326,7 +324,7 @@ export const verifyForgotPasswordOtp=async(req:Request,res:Response,next:NextFun
     if(!email || !otp){
       throw new ValidationError("Email Required");
        }
-    const isOtpValid = await verifyOtp(email, otp); // No `next` passed
+    const isOtpValid = await verifyOtp(email, otp); 
 if (!isOtpValid) {
   throw new ValidationError("Invalid OTP");
 }
