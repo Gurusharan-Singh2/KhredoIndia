@@ -215,5 +215,76 @@ export const resetUserPassword=async(req:Request,res:Response,next:NextFunction)
   }
 }
 
+// register a seller
 
+export const registerSeller=async(req:Request,res:Response,next:NextFunction)=>{
+try {
+  
+  
+  validateRegistrationData(req.body,"seller");
+  const {name,email}=req.body;
 
+  const existingSeller=await prisma.sellers.findUnique({where:{
+    email:email
+  }})
+
+  if(existingSeller){
+    throw new ValidationError("Seller Already Exist!");
+  }
+   await checkOtpRestrictions(email);
+  await trackOtpRequests(email);
+
+  await  sendOtp(name,email);
+
+  res.status(200).json({
+    message:"Otp Sent to Email !Please Verify Account!"
+  })
+} catch (error) {
+  
+
+  return next(error)
+}
+}
+
+// verify seller otp 
+
+export const verifySellerOtp =async(req:Request,res:Response,next:NextFunction)=>{
+try {
+  
+    const {email,otp,name,password,phone,country}=req.body
+  if(!email || !otp || !name || !password || !phone || !country){
+    throw new ValidationError("All fields are required!!")
+  };
+
+  const existingSeller=await prisma.sellers.findUnique({
+    where:{
+      email
+    }
+  })
+
+  if(existingSeller){
+    throw new ValidationError("Seller already exists with this email! ");
+  }
+   const isOtpValid = await verifyOtp(email, otp); 
+if (!isOtpValid) {
+  return next(new ValidationError("Invalid OTP"));
+}
+
+const hashedPassword= await bcrypt.hash(password,10);
+
+const seller=await prisma.sellers.create({ data:{
+    name,email,password:hashedPassword,country,phone_number:phone
+
+  }
+});
+
+  
+
+  res.status(201).json({
+    seller
+  })
+
+} catch (error) {
+  return next(error)
+}
+}

@@ -42,8 +42,24 @@ export const checkOtpRestrictions=async(email:string)=>{
 
 }
 
+// track otp request
+export const trackOtpRequests=async(email:string)=>{
+  const otpRequestKey=`otp_request_count:${email}`
+  let otpRequest=parseInt((await redis.get(otpRequestKey))|| "0");
+  if(otpRequest>=2){
+    await redis.set(`otp_spam_lock:${email}`,"locked","EX",3600); // for 1 hour
+    throw new ValidationError("To many otp request .Please wait 1 hour before requesting otp")
+
+  }
+
+  await redis.set(otpRequestKey,otpRequest+1,"EX",3600);
+
+
+
+}
+
 // send otp
-export const sendOtp=async(name:string,email:string,)=>{
+export const sendOtp=async(name:string,email:string)=>{
 
   const otp=crypto.randomInt(10000,99999).toString();
 
@@ -243,21 +259,7 @@ export const generateForgotEmailTemplate = (otp: string, name: string) => `
 `;
 
 
-// track otp request
-export const trackOtpRequests=async(email:string)=>{
-  const otpRequestKey=`otp_request_count:${email}`
-  let otpRequest=parseInt((await redis.get(otpRequestKey))|| "0");
-  if(otpRequest>=2){
-    await redis.set(`otp_spam_lock:${email}`,"locked","EX",3600); // for 1 hour
-    throw new ValidationError("To many otp request .Please wait 1 hour before requesting otp")
 
-  }
-
-  await redis.set(otpRequestKey,otpRequest+1,"EX",3600);
-
-
-
-}
 
 // verify otp
 
@@ -296,7 +298,7 @@ export const handleForgotPassword=async(req:Request,res:Response,next:NextFuncti
        }
       
    
-    const user= usertype==="user" && await prisma.users.findUnique({where:{email}}) ;
+    const user= usertype==="user" ?  await prisma.users.findUnique({where:{email}}) : await prisma.sellers.findUnique({where:email}) ;
     if(!user){
       throw new AuthenticationError("User not found!!!");
     }
